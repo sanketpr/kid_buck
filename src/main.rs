@@ -7,7 +7,7 @@ use std::fs::File;
 use csv::Reader;
 use std::collections::HashMap;
 use processor::{BasicProcessor};
-use transaction::{Transaction};
+use transaction::{Transaction, ClientAccount};
 
 fn main() -> Result<(), Box<dyn Error>> {
     let args: Vec<String> = env::args().collect();
@@ -26,11 +26,25 @@ fn main() -> Result<(), Box<dyn Error>> {
 
     for result in rdr.deserialize() {
         let tx: Transaction = result?;
-        println!("{:?}", &processor.process_transaction(tx));
+        let _ = processor.process_transaction(tx);
     }
 
-    dbg!(processor.past_transactions);
-    dbg!(processor.client_accounts);
-
+    print_client_accounts_csv(&processor.client_accounts);
     Ok(())
 }
+
+pub fn print_client_accounts_csv(accounts: &HashMap<u32, ClientAccount>) {
+    println!("client_id,available,held,total,locked");
+
+    for (client_id, account) in accounts {
+        println!(
+            "{},{:.4},{:.4},{:.4},{}",
+            client_id,
+            account.available,
+            account.held,
+            account.total,
+            account.locked
+        );
+    }
+}
+

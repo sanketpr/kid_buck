@@ -1,8 +1,8 @@
-use serde::Deserialize;
+use serde::{Deserialize, Serialize};
 
 pub type ClientId = u32;
 
-#[derive(Debug, Clone, Copy)]
+#[derive(Debug, Clone, Copy, Serialize)]
 pub struct ClientAccount {
     pub total: f64,
     pub available: f64,
@@ -20,7 +20,6 @@ impl ClientAccount {
         }
     }
 }
-
 
 #[derive(Debug, Deserialize, Clone, Copy)]
 pub struct Transaction {
