@@ -7,7 +7,7 @@ pub struct ClientAccount {
     pub total: f64,
     pub available: f64,
     pub held: f64,
-    pub is_account_frozen: bool,
+    pub locked: bool,
 }
 
 impl ClientAccount {
@@ -16,13 +16,13 @@ impl ClientAccount {
             total: 0.0,
             available: 0.0,
             held: 0.0,
-            is_account_frozen: false
+            locked: false
         }
     }
 }
 
 
-#[derive(Debug, Deserialize)]
+#[derive(Debug, Deserialize, Clone, Copy)]
 pub struct Transaction {
     pub r#type: TransactionType,
     pub client: u32,
@@ -30,7 +30,7 @@ pub struct Transaction {
     pub amount: Option<f64>,
 }
 
-#[derive(Debug, Deserialize)]
+#[derive(PartialEq, Eq, Debug, Deserialize, Clone, Copy)]
 #[serde(rename_all = "lowercase")]
 pub enum TransactionType {
     Deposit,
