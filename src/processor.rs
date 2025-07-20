@@ -21,91 +21,84 @@ impl BasicProcessor {
         tx: Transaction
     ) -> String {
         let client_id = &tx.client;
+        let existing_client_account = self.client_accounts.get(client_id);
+
+        match existing_client_account {
+            Some(account) => {
+                if account.is_account_frozen {
+                    return "Account is fronzen, transaction declined".to_owned()
+                }
+            }
+            _ => {}
+        };
+
         match tx.r#type {
             TransactionType::Deposit => {
-                let client_account = self.client_accounts.get_mut(client_id);
-                let mut client_account = match client_account {
+                let mut client_account = match self.client_accounts.get(client_id) {
                     Some(account) => account.to_owned(),
-                    None => {
-                        let new_account = ClientAccount::new();
-                        self.client_accounts.insert(*client_id, new_account.clone());
-                        new_account
-                    }
+                    None => ClientAccount::new()
                 };
-                let _ = self.process_deposit(&tx, &mut client_account);
-                
-                format!("Deposit accepted for Client")
+                let res = self.process_deposit(&tx, &mut client_account);
+                match res {
+                    Ok(()) => {
+                        self.client_accounts.insert(*client_id, client_account);
+                        format!("Deposit. Client id {}, Transaction id {}, Amount {}", tx.client, tx.tx, tx.amount.unwrap())
+                    },
+                    Err(e) => {
+                        e
+                    }
+                }
             }
             TransactionType::Withdrawal => {
                 let client_account = self.client_accounts.get(client_id).cloned();
-                match client_account.ok_or("Account not found".to_owned())
-                .and_then(|account| self.process_withdrawal(&tx, &account)) {
+                let res = client_account.ok_or("Account not found".to_owned())
+                    .and_then(|account| self.process_withdrawal(&tx, &account));
+
+                match res {
                     Ok(()) => {
                         self.client_accounts.insert(*client_id, client_account.expect("expected client account"));
-                        format!("Success")
+                        format!("Withdraw. Client id {}, Transaction id {}, Amount {}", tx.client, tx.tx, tx.amount.unwrap())
                     },
                     Err(e) => e
                 }
             }
             TransactionType::Dispute => {
-                let past_transaction = self.past_transactions.iter().find({ |&pt|   
-                    pt.tx == tx.tx
-                });
-    
-                let client_account = self.client_accounts.get(&tx.client);
-    
-                match (past_transaction, client_account) {
-                    (Some(past_transac), Some(client_account)) => {
-                        let mut client_account = client_account.to_owned();
-                        client_account.available -= past_transac.amount.expect("Transaction amount is None");
-                        client_account.held += past_transac.amount.expect("Transaction amount is None");
-                        self.client_accounts.insert(tx.tx, client_account);
-                        format!("Valid transaction not found")
-                    }
-                    _ => {
-                        format!("Invalid transaction id")
-                    }
+                let client_account = self.client_accounts.get(client_id).cloned();
+                let res = client_account.ok_or("Account not found".to_owned())
+                    .and_then(|mut account| self.process_dispute(&tx, &mut account));
+
+                match res {
+                    Ok(()) => {
+                        self.client_accounts.insert(*client_id, client_account.expect("expected client account"));
+                        format!("Withdrew. Client id {}, Transaction id {}, Amount {}", tx.client, tx.tx, tx.amount.unwrap())
+                    },
+                    Err(e) => e
                 }
             }
             TransactionType::Resolve => {
-                let past_transaction = self.past_transactions.iter().find({ |&pt|   
-                    pt.tx == tx.tx
-                });
-    
-                let client_account = self.client_accounts.get(&tx.client);
-    
-                match (past_transaction, client_account) {
-                    (Some(past_transac), Some(client_account)) => {
-                        let mut client_account = client_account.to_owned();
-                        client_account.available += past_transac.amount.expect("Transaction amount is None");
-                        client_account.held -= past_transac.amount.expect("Transaction amount is None");
-                        self.client_accounts.insert(tx.tx, client_account);
-                        format!("Valid transaction not found")
-                    }
-                    _ => {
-                        format!("Invalid transaction")
-                    }
+                let client_account = self.client_accounts.get(client_id).cloned();
+                let res = client_account.ok_or("Account not found".to_owned())
+                    .and_then(|mut account| self.process_resolve(&tx, &mut account));
+
+                match res {
+                    Ok(()) => {
+                        self.client_accounts.insert(*client_id, client_account.expect("expected client account"));
+                        format!("Resolved. Client id {}, Transaction id {}, Amount {}", tx.client, tx.tx, tx.amount.unwrap())
+                    },
+                    Err(e) => e
                 }
             }
             TransactionType::Chargeback => {
-                let past_transaction = self.past_transactions.iter().find({ |&pt|   
-                    pt.tx == tx.tx
-                });
-    
-                let client_account = self.client_accounts.get(&tx.client);
-    
-                match (past_transaction, client_account) {
-                    (Some(past_transac), Some(client_account)) => {
-                        let mut client_account = client_account.to_owned();
-                        client_account.total -= past_transac.amount.expect("Transaction amount is None");
-                        client_account.held -= past_transac.amount.expect("Transaction amount is None");
-                        client_account.is_account_frozen = true;
-                        self.client_accounts.insert(tx.tx, client_account);
-                        format!("Valid transaction not found")
-                    }
-                    _ => {
-                        format!("Invalid transaction id.")
-                    }
+                let client_account = self.client_accounts.get(client_id).cloned();
+                let res = client_account.ok_or("Account not found".to_owned())
+                    .and_then(|mut account| self.process_chargeback(&tx, &mut account));
+
+                match res {
+                    Ok(()) => {
+                        self.client_accounts.insert(*client_id, client_account.expect("expected client account"));
+                        format!("Resolved. Client id {}, Transaction id {}, Amount {}", tx.client, tx.tx, tx.amount.unwrap())
+                    },
+                    Err(e) => e
                 }
             }
         }
@@ -142,7 +135,70 @@ impl BasicProcessor {
         }
     }
 
-    // fn process_dispute(&mut self, transaction: &Transaction, client_account: &mut ClientAccount) -> Result<(), String> {
-    //     Ok(())
-    // }
+    fn process_dispute(&mut self, transaction: &Transaction, client_account: &mut ClientAccount) -> Result<(), String> {
+        let past_transaction = self.past_transactions.iter().find({ |&pt|   
+            pt.tx == transaction.tx 
+        });
+        match past_transaction {
+            Some(past_transac) => {
+            client_account.available -= past_transac.amount.expect("Transaction amount is None");
+            client_account.held += past_transac.amount.expect("Transaction amount is None");
+            Ok(())
+        }
+            None => {
+                Err("Invalid transaction id".to_owned())
+            }
+        }
+    }
+
+    fn process_chargeback(&mut self, transaction: &Transaction, client_account: &mut ClientAccount) -> Result<(), String> {
+        let past_transaction = self.past_transactions.iter().find({ |&pt|   
+            pt.tx == transaction.tx 
+        });
+        match past_transaction {
+            Some(past_transac) => {
+                client_account.held -= past_transac.amount.expect("Transaction amount is None");
+                client_account.total -= past_transac.amount.expect("Transaction amount is None");
+                client_account.is_account_frozen = true;
+                Ok(())
+            },
+            None => {
+                Err("Invalid transaction id".to_owned())
+            }
+        }
+    }
+    
+    fn process_resolve(&mut self, transaction: &Transaction, client_account: &mut ClientAccount) -> Result<(), String> {
+        let past_transaction = self.past_transactions.iter().find({ |&pt|   
+            pt.tx == transaction.tx 
+        });
+        match past_transaction {
+            Some(past_transac) => {
+                client_account.held -= past_transac.amount.expect("Transaction amount is None");
+                client_account.available += past_transac.amount.expect("Transaction amount is None");
+                Ok(())
+            },
+            None => {
+                Err("Invalid transaction id".to_owned())
+            }
+        }
+    }
+}
+
+fn _process_delegate<F>(client_accounts: &mut HashMap<ClientId, ClientAccount>,
+    transaction: &Transaction,
+    process_fn: F) -> Result<(), String>
+    where F: Fn(&Transaction, &mut ClientAccount) -> Result<(), String> {
+        let client_id = &transaction.client;
+        let client_account = client_accounts.get(client_id).cloned();
+        let res = client_account.ok_or("Account not found".to_owned())
+            .and_then(|mut account| process_fn(&transaction, &mut account));
+
+        match res {
+            Ok(()) => {
+                client_accounts.insert(*client_id, client_account.expect("expected client account"));
+                Ok(())
+            },
+            Err(e) => Err(e)
+        }
 }

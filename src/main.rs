@@ -7,7 +7,7 @@ use std::fs::File;
 use csv::Reader;
 use std::collections::HashMap;
 use processor::{BasicProcessor};
-use transaction::{Transaction, TransactionType, ClientAccount,ClientId};
+use transaction::{Transaction};
 
 fn main() -> Result<(), Box<dyn Error>> {
     let args: Vec<String> = env::args().collect();
