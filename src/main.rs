@@ -1,5 +1,5 @@
 mod processor;
-mod transaction;
+mod transaction_models;
 
 use std::env;
 use std::error::Error;
@@ -7,7 +7,7 @@ use std::fs::File;
 use csv::Reader;
 use std::collections::HashMap;
 use processor::{BasicProcessor};
-use transaction::{Transaction, ClientAccount};
+use transaction_models::{Transaction, ClientAccount};
 
 fn main() -> Result<(), Box<dyn Error>> {
     let args: Vec<String> = env::args().collect();

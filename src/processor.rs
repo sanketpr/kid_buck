@@ -1,4 +1,4 @@
-use crate::transaction::{ClientAccount, ClientId, Transaction, TransactionType};
+use crate::transaction_models::{ClientAccount, ClientId, Transaction, TransactionType};
 use std::collections::HashMap;
 
 pub struct BasicProcessor {
