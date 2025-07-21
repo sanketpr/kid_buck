@@ -1,6 +1,9 @@
-# 🦀 Rust Payment Processor
+# 🐐 Kid-Buck
 
-A payment processing system implemented in Rust, built for. It ingests transaction records from CSV, processes them through robust ledger logic, and outputs final client account states—all with minimal memory overhead and modular design.
+**Kid-Buck** is a fast, memory-efficient payment processor written in 🦀 Rust. It ingests transactions via CSV  and models client account states with full lifecycle logic—including deposits, withdrawals, disputes, resolutions, and chargebacks.
+
+Thanks to Rust’s [`csv`](https://docs.rs/csv/latest/csv/) crate, **Kid-Buck** leverages its default line-by-line streaming behavior. This means transactions are read and processed incrementally without buffering the entire file into memory—allowing it to handle very large datasets with minimal memory overhead.
+
 
 ---
 
@@ -45,6 +48,9 @@ This processor is designed for learning purposes, and while it handles all major
 - **Chargeback without prior dispute**  
   `chargeback` actions can be executed even if the associated transaction was never disputed, which breaks the intended flow of `dispute → chargeback`.
 
+- **Synchronous processing limits concurrency**  
+  The current implementation processes each transaction sequentially, which can be limiting for responsiveness and scalability—especially when integrated with streaming systems like NATS. Refactoring to use `async` functions and Rust's `tokio` runtime would allow concurrent transaction handling, better I/O responsiveness, and improved throughput in real-time environments.
+
 - **Transaction ID duplication**  
   The system assumes the transaction ids are not duplicated and does not enforce uniqueness for `tx` IDs. This means multiple transactions may share the same ID, which could lead to ambiguity and logic conflicts.
 
@@ -68,6 +74,7 @@ To harden the processor and increase correctness:
 
 - Track the lifecycle of each transaction (`Disputed`, `Resolved`, `ChargedBack`)
 - Enforce one-time dispute actions per transaction
+- Non-blocking or asynchronous processing of transaction.
 - Ensure `tx` uniqueness across the dataset
 - Block disputes when available balance is insufficient
 - Improve validation and error feedback via custom error types
